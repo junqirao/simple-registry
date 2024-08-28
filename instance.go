@@ -33,8 +33,12 @@ type (
 	}
 )
 
-func NewInstance(serviceName string) *Instance {
-	return &Instance{ServiceName: serviceName}
+func NewInstance(serviceName ...string) *Instance {
+	ins := &Instance{}
+	if len(serviceName) > 0 && serviceName[0] != "" {
+		ins.ServiceName = serviceName[0]
+	}
+	return ins
 }
 
 func (i *Instance) WithAddress(host string, port int) *Instance {

@@ -81,6 +81,7 @@ func NewRegistry(ctx context.Context, cfg Config) (r Interface, err error) {
 		reg.cli, err = newEtcd(ctx, cfg.Database)
 	default:
 		err = fmt.Errorf("unknown registry type \"%s\"", cfg.Type)
+		return
 	}
 	go reg.watch(context.Background())
 	r = reg
