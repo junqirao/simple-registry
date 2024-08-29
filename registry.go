@@ -14,7 +14,9 @@ var (
 	// Registry Global instance of registry, use it after Init
 	Registry Interface
 	// currentInstance created at Init
-	currentInstance = &Instance{}
+	currentInstance      *Instance
+	onceLoad             = sync.Once{}
+	ErrAlreadyRegistered = errors.New("already registered")
 )
 
 // event type define
@@ -27,8 +29,8 @@ const (
 type (
 	// Interface abstracts registry
 	Interface interface {
-		// Register register currentInstance
-		Register(ctx context.Context) (err error)
+		// register currentInstance
+		register(ctx context.Context, ins *Instance) (err error)
 		// Deregister deregister currentInstance
 		Deregister(ctx context.Context) (err error)
 		// GetService by service name
@@ -42,7 +44,7 @@ type (
 	// EventType of instance change
 	EventType string
 	// EventHandler of instance change
-	EventHandler func(ctx context.Context, i *Instance, e EventType)
+	EventHandler func(i *Instance, e EventType)
 	// eventWrapper ...
 	eventWrapper struct {
 		handler EventHandler
@@ -50,19 +52,20 @@ type (
 	}
 )
 
-// Init registry module with config, if *Instance is provided will be register automatically
+// Init registry module with config and sync services info from database and build local caches.
+// if *Instance is provided will be register automatically.
+// if context is done, watch loop will stop and local cache won't be updated anymore.
 func Init(ctx context.Context, config Config, ins ...*Instance) (err error) {
-	// create registry instance
-	if Registry, err = NewRegistry(ctx, config); err != nil {
-		return
-	}
-	// collect instance info and register
-	if len(ins) > 0 && ins[0] != nil {
-		i := ins[0].clone()
-		i.fillInfo()
-		currentInstance = i
-		err = Registry.Register(ctx)
-	}
+	onceLoad.Do(func() {
+		// create registry instance
+		if Registry, err = newRegistry(ctx, config); err != nil {
+			return
+		}
+		// collect instance info and register
+		if len(ins) > 0 && ins[0] != nil {
+			err = Registry.register(ctx, ins[0].fillInfo().clone())
+		}
+	})
 	return
 }
 
@@ -73,7 +76,7 @@ type registry struct {
 	evs   *eventWrapper
 }
 
-func NewRegistry(ctx context.Context, cfg Config) (r Interface, err error) {
+func newRegistry(ctx context.Context, cfg Config) (r Interface, err error) {
 	cfg.check()
 	reg := &registry{cfg: &cfg}
 	switch cfg.Type {
@@ -83,21 +86,29 @@ func NewRegistry(ctx context.Context, cfg Config) (r Interface, err error) {
 		err = fmt.Errorf("unknown registry type \"%s\"", cfg.Type)
 		return
 	}
-	go reg.watch(context.Background())
-	r = reg
-	return
+
+	// build local cache
+	reg.buildCache(ctx)
+	// watch changes and update local cache
+	// ** notice if context.Done() watch loop will stop
+	go reg.watch(ctx)
+
+	return reg, nil
 }
 
-func (r *registry) Register(ctx context.Context) (err error) {
+func (r *registry) register(ctx context.Context, ins *Instance) (err error) {
 	// check is already registered
+	if currentInstance != nil {
+		return ErrAlreadyRegistered
+	}
+	currentInstance = ins
 	service, err := r.GetService(ctx, currentInstance.ServiceName)
 	if err != nil {
 		return
 	}
 	for _, instance := range service.instances {
 		if instance.Id == currentInstance.Id {
-			err = errors.New("instance already registered")
-			return
+			return ErrAlreadyRegistered
 		}
 	}
 	// register with heartbeat
@@ -108,12 +119,15 @@ func (r *registry) Register(ctx context.Context) (err error) {
 		return
 	}
 	g.Log().Infof(ctx, "registry success: %s", currentInstance.String())
-	// build local cache
+	// rebuild local cache
 	r.buildCache(ctx)
 	return
 }
 
 func (r *registry) Deregister(ctx context.Context) (err error) {
+	if currentInstance == nil {
+		return
+	}
 	err = r.cli.Delete(ctx, currentInstance.registryIdentity())
 	return
 }
@@ -171,7 +185,7 @@ func (r *registry) buildCache(ctx context.Context) {
 		} else {
 			service = v.(*Service)
 		}
-		service.Append(instance)
+		service.append(instance)
 		size++
 	}
 
@@ -191,7 +205,7 @@ func (r *registry) watch(ctx context.Context) {
 					service = value.(*Service)
 				)
 
-				instance = service.Remove(strings.TrimPrefix(e.Key, r.cfg.Prefix))
+				instance = service.remove(strings.TrimPrefix(e.Key, r.cfg.Prefix))
 				deleted = instance != nil
 
 				if deleted {
@@ -217,7 +231,7 @@ func (r *registry) watch(ctx context.Context) {
 				return
 			}
 			if e.Type == EventTypeUpdate {
-				service.Append(instance)
+				service.append(instance)
 			} else if e.Type == EventTypeUpdate {
 				service.Range(func(i *Instance) bool {
 					if i.Id == instance.Id {
@@ -229,22 +243,23 @@ func (r *registry) watch(ctx context.Context) {
 			}
 
 			r.cache.Store(instance.ServiceName, service)
-			if instance.Id == currentInstance.Id {
+			if currentInstance != nil && instance.Id == currentInstance.Id {
 				currentInstance = instance.clone()
 			}
 		}
 
-		r.pushEvent(ctx, instance, e.Type)
+		r.pushEvent(instance, e.Type)
 	})
 	if err != nil {
 		g.Log().Errorf(ctx, "registry failed to watch etcd: %v", err)
 	}
 }
 
-func (r *registry) pushEvent(_ context.Context, instance *Instance, e EventType) {
+func (r *registry) pushEvent(instance *Instance, e EventType) {
+	ins := instance.clone()
 	p := r.evs
 	for p != nil {
-		go p.handler(context.Background(), instance, e)
+		go p.handler(ins, e)
 		p = p.next
 	}
 }

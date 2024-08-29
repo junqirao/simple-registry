@@ -29,7 +29,7 @@ type (
 
 	// TlsConfig ...
 	TlsConfig struct {
-		InsecureSkipVerify bool
+		InsecureSkipVerify bool `json:"insecure_skip_verify"`
 	}
 )
 

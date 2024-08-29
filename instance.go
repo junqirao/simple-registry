@@ -95,7 +95,7 @@ func (i *Instance) clone() *Instance {
 	}
 }
 
-func (i *Instance) fillInfo() {
+func (i *Instance) fillInfo() *Instance {
 	if i.Id == "" {
 		i.Id = uuid.New().String()
 	}
@@ -116,9 +116,10 @@ func (i *Instance) fillInfo() {
 			i.Host = i.HostName
 		}
 	}
+	return i
 }
 
-func (s *Service) Remove(id string) *Instance {
+func (s *Service) remove(id string) *Instance {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for i, instance := range s.instances {
@@ -128,6 +129,13 @@ func (s *Service) Remove(id string) *Instance {
 		}
 	}
 	return nil
+}
+
+// append instance to instances
+func (s *Service) append(instance ...*Instance) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.instances = append(s.instances, instance...)
 }
 
 // Range instances
@@ -146,9 +154,13 @@ func (s *Service) Len() int {
 	return len(s.instances)
 }
 
-// Append instance to instances
-func (s *Service) Append(instance ...*Instance) {
+// Instances slice copy of this service
+func (s *Service) Instances() []*Instance {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.instances = append(s.instances, instance...)
+	var ins []*Instance
+	for _, instance := range s.instances {
+		ins = append(ins, instance.clone())
+	}
+	return ins
 }
