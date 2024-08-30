@@ -83,8 +83,10 @@ func (i *Instance) registryIdentity(prefix ...string) string {
 
 func (i *Instance) clone() *Instance {
 	meta := make(map[string]interface{})
-	for k, v := range i.Meta {
-		meta[k] = v
+	if i.Meta != nil {
+		for k, v := range i.Meta {
+			meta[k] = v
+		}
 	}
 	return &Instance{
 		Id:          i.Id,
