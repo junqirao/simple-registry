@@ -12,6 +12,7 @@ import (
 const (
 	defaultRegistryPrefix    = "/default-registry-service/"
 	defaultHeartBeatInterval = 3
+	defaultIdentitySeparator = "/"
 	defaultPort              = 8000
 )
 
@@ -34,7 +35,7 @@ type (
 )
 
 func NewInstance(serviceName ...string) *Instance {
-	ins := &Instance{}
+	ins := &Instance{Meta: make(map[string]interface{})}
 	if len(serviceName) > 0 && serviceName[0] != "" {
 		ins.ServiceName = serviceName[0]
 	}
@@ -59,7 +60,7 @@ func (i *Instance) WithMetaData(meta map[string]interface{}) *Instance {
 
 // Identity generate identity
 func (i *Instance) Identity(separator ...string) string {
-	sep := "_"
+	sep := defaultIdentitySeparator
 	if len(separator) > 0 {
 		sep = separator[0]
 	}
