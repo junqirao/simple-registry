@@ -10,13 +10,19 @@ import (
 	"github.com/gogf/gf/v2/frame/g"
 )
 
+// global variable define
 var (
 	// Registry Global instance of registry, use it after Init
 	Registry Interface
 	// currentInstance created at Init
-	currentInstance      *Instance
-	onceLoad             = sync.Once{}
+	currentInstance *Instance
+	onceLoad        = sync.Once{}
+)
+
+// error define
+var (
 	ErrAlreadyRegistered = errors.New("already registered")
+	ErrServiceNotFound   = errors.New("service not found")
 )
 
 // event type define
@@ -89,9 +95,9 @@ func newRegistry(ctx context.Context, cfg Config) (r Interface, err error) {
 
 	// build local cache
 	reg.buildCache(ctx)
-	// watch changes and update local cache
-	// ** notice if context.Done() watch loop will stop
-	go reg.watch(ctx)
+	// watchAndUpdateCache changes and update local cache
+	// ** notice if context.Done() watchAndUpdateCache loop will stop
+	go reg.watchAndUpdateCache(ctx)
 
 	return reg, nil
 }
@@ -102,16 +108,22 @@ func (r *registry) register(ctx context.Context, ins *Instance) (err error) {
 		return ErrAlreadyRegistered
 	}
 	currentInstance = ins
-	service, err := r.GetService(ctx, currentInstance.ServiceName)
+
+	// get or create service
+	service, err := r.getOrCreateService(ctx, currentInstance.ServiceName)
 	if err != nil {
 		return
-	}
-	for _, instance := range service.instances {
-		if instance.Id == currentInstance.Id {
-			return ErrAlreadyRegistered
+	} else {
+		// check if already registered
+		for _, instance := range service.instances {
+			if instance.Identity() == currentInstance.Identity() {
+				return ErrAlreadyRegistered
+			}
 		}
 	}
+
 	// register with heartbeat
+	// renew a context in case upstream context closed cause heartbeat timeout
 	if err = r.cli.Set(context.Background(),
 		currentInstance.registryIdentity(r.cfg.Prefix),
 		currentInstance.String(),
@@ -119,6 +131,7 @@ func (r *registry) register(ctx context.Context, ins *Instance) (err error) {
 		return
 	}
 	g.Log().Infof(ctx, "registry success: %s", currentInstance.String())
+
 	// rebuild local cache
 	r.buildCache(ctx)
 	return
@@ -137,7 +150,7 @@ func (r *registry) GetService(_ context.Context, serviceName string) (service *S
 	if ok {
 		service = value.(*Service)
 	} else {
-		service = new(Service)
+		err = ErrServiceNotFound
 	}
 	return
 }
@@ -192,7 +205,7 @@ func (r *registry) buildCache(ctx context.Context) {
 	g.Log().Infof(ctx, "registry etcd cache builded, size=%v", size)
 }
 
-func (r *registry) watch(ctx context.Context) {
+func (r *registry) watchAndUpdateCache(ctx context.Context) {
 	err := r.cli.Watch(ctx, r.cfg.Prefix, func(ctx context.Context, e Event) {
 		var instance *Instance
 		switch e.Type {
@@ -208,12 +221,9 @@ func (r *registry) watch(ctx context.Context) {
 				instance = service.remove(strings.TrimPrefix(e.Key, r.cfg.Prefix))
 				deleted = instance != nil
 
-				if deleted {
-					if len(service.instances) == 0 {
-						r.cache.Delete(key)
-					} else {
-						r.cache.Store(key, service)
-					}
+				// remove empty service
+				if len(service.instances) == 0 {
+					r.cache.Delete(key)
 				}
 				return !deleted
 			})
@@ -221,16 +231,19 @@ func (r *registry) watch(ctx context.Context) {
 			g.Log().Infof(ctx, "registry node register event: %v", e.Key)
 			instance = new(Instance)
 			if err := e.Value.Struct(&instance); err != nil {
-				g.Log().Errorf(ctx, "registry failed to update on watch: %v", err)
+				g.Log().Errorf(ctx, "registry failed to update on watchAndUpdateCache: %v", err)
 				return
 			}
 
-			service, err := r.GetService(ctx, instance.ServiceName)
+			// get or create service
+			service, err := r.getOrCreateService(ctx, instance.ServiceName)
 			if err != nil {
-				g.Log().Errorf(ctx, "registry failed to update on watch: %v", err)
+				g.Log().Errorf(ctx, "registry failed to update on watchAndUpdateCache: %v", err)
 				return
 			}
-			if e.Type == EventTypeUpdate {
+
+			// update or insert instance to service
+			if e.Type == EventTypeCreate {
 				service.append(instance)
 			} else if e.Type == EventTypeUpdate {
 				service.Range(func(i *Instance) bool {
@@ -242,7 +255,7 @@ func (r *registry) watch(ctx context.Context) {
 				})
 			}
 
-			r.cache.Store(instance.ServiceName, service)
+			// update currentInstance
 			if currentInstance != nil && instance.Id == currentInstance.Id {
 				currentInstance = instance.clone()
 			}
@@ -251,7 +264,7 @@ func (r *registry) watch(ctx context.Context) {
 		r.pushEvent(instance, e.Type)
 	})
 	if err != nil {
-		g.Log().Errorf(ctx, "registry failed to watch etcd: %v", err)
+		g.Log().Errorf(ctx, "registry failed to watchAndUpdateCache etcd: %v", err)
 	}
 }
 
@@ -262,4 +275,17 @@ func (r *registry) pushEvent(instance *Instance, e EventType) {
 		go p.handler(ins, e)
 		p = p.next
 	}
+}
+
+func (r *registry) getOrCreateService(ctx context.Context, serviceName string) (service *Service, err error) {
+	service, err = r.GetService(ctx, serviceName)
+	switch {
+	case errors.Is(err, ErrServiceNotFound):
+		service = new(Service)
+		r.cache.Store(serviceName, service)
+		err = nil
+	case err == nil:
+	default:
+	}
+	return
 }
