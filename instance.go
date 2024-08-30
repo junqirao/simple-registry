@@ -141,6 +141,20 @@ func (s *Service) append(instance ...*Instance) {
 	s.instances = append(s.instances, instance...)
 }
 
+// upsert or insert instance to instances. notice: insertion not in order
+func (s *Service) upsert(instance *Instance) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for i, ori := range s.instances {
+		if ori.Identity() == instance.Identity() {
+			s.instances[i] = instance
+			return
+		}
+	}
+	s.instances = append(s.instances, instance)
+}
+
 // Range instances
 func (s *Service) Range(h func(instance *Instance) bool) {
 	s.mu.Lock()

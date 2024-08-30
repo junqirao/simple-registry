@@ -28,7 +28,7 @@ var (
 // event type define
 const (
 	EventTypeCreate EventType = "create"
-	EventTypeUpdate EventType = "update"
+	EventTypeUpdate EventType = "upsert"
 	EventTypeDelete EventType = "delete"
 )
 
@@ -95,7 +95,7 @@ func newRegistry(ctx context.Context, cfg Config) (r Interface, err error) {
 
 	// build local cache
 	reg.buildCache(ctx)
-	// watchAndUpdateCache changes and update local cache
+	// watchAndUpdateCache changes and upsert local cache
 	// ** notice if context.Done() watchAndUpdateCache loop will stop
 	go reg.watchAndUpdateCache(ctx)
 
@@ -191,14 +191,14 @@ func (r *registry) buildCache(ctx context.Context) {
 
 		serviceName := instance.ServiceName
 		v, ok := r.cache.Load(serviceName)
-		var service *Service
 		if !ok || v == nil {
-			service = new(Service)
+			service := new(Service)
 			r.cache.Store(serviceName, service)
+			service.append(instance)
 		} else {
-			service = v.(*Service)
+			v.(*Service).upsert(instance)
 		}
-		service.append(instance)
+
 		size++
 	}
 
@@ -231,31 +231,21 @@ func (r *registry) watchAndUpdateCache(ctx context.Context) {
 			g.Log().Infof(ctx, "registry node register event: %v", e.Key)
 			instance = new(Instance)
 			if err := e.Value.Struct(&instance); err != nil {
-				g.Log().Errorf(ctx, "registry failed to update on watchAndUpdateCache: %v", err)
+				g.Log().Errorf(ctx, "registry failed to upsert on watchAndUpdateCache: %v", err)
 				return
 			}
 
 			// get or create service
 			service, err := r.getOrCreateService(ctx, instance.ServiceName)
 			if err != nil {
-				g.Log().Errorf(ctx, "registry failed to update on watchAndUpdateCache: %v", err)
+				g.Log().Errorf(ctx, "registry failed to upsert on watchAndUpdateCache: %v", err)
 				return
 			}
 
-			// update or insert instance to service
-			if e.Type == EventTypeCreate {
-				service.append(instance)
-			} else if e.Type == EventTypeUpdate {
-				service.Range(func(i *Instance) bool {
-					if i.Id == instance.Id {
-						*i = *instance
-						return false
-					}
-					return true
-				})
-			}
+			// upsert or insert instance to service
+			service.upsert(instance)
 
-			// update currentInstance
+			// upsert currentInstance
 			if currentInstance != nil && instance.Id == currentInstance.Id {
 				currentInstance = instance.clone()
 			}
