@@ -89,11 +89,10 @@ func (e *etcd) keepalive(ctx context.Context, lease clientv3.Lease, id clientv3.
 	for {
 		select {
 		case _ = <-resCh:
+			// discard keepalive message
 			// g.Log().Infof(ctx, "etcd keepalive %v", resp)
 		case <-ctx.Done():
 			return
-		default:
-
 		}
 	}
 }
