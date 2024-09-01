@@ -1,6 +1,6 @@
 ## Simple Registry
 
-providing basic registry function
+providing basic registry function and cached storage
 
 ### supported database
 
@@ -9,6 +9,10 @@ providing basic registry function
 * consul (todo)
 
 ### usage
+
+#### registry
+
+basic registry, provide instance and service management
 
 ```golang
 package main
@@ -83,5 +87,62 @@ func main() {
 
 ```
 
+#### storage
+
+high performance distributed local cached storage
+
+```go
+package main
+
+import (
+	"context"
+
+	registry "github.com/junqirao/simple-registry"
+)
+
+func main() {
+	// init registry, see usage of registry
+	// ......
+	ctx := context.Background()
+	// get instance
+	sto := registry.Storages.Get(ctx)
+
+	// set value
+	err := sto.Set(context.Background(), "key", "value")
+	if err != nil {
+		// do something
+		return
+	}
+	err = sto.Set(context.Background(), "key1", "value1")
+	if err != nil {
+		// do something
+		return
+	}
+
+	// get all data
+	kvs, err := sto.Get(context.Background())
+	if err != nil {
+		// do something
+		return
+	}
+	// kvs=[{Key: "key", Value: "value"},{Key: "key1", Value: "value1"}]
+
+	// get one
+	kvs, err = sto.Get(context.Background(), "key")
+	if err != nil {
+		// do something
+		return
+	}
+	// kvs=[{Key: "key", Value: "value"}]
+
+	// delete
+	err = sto.Delete(context.Background(), "key")
+	if err != nil {
+		// do something
+		return
+	}
+}
+
+```
 
 

@@ -11,7 +11,9 @@ func dfs(node *storageNode) {
 	if node == nil {
 		return
 	}
-	fmt.Printf("%s: %+v\n", node.name, node.values)
+	for _, value := range node.values {
+		fmt.Printf("[%s] key=%v value=%v\n", node.name, value.Key, value.Value)
+	}
 	node.next.Range(func(_, value any) bool {
 		dfs(value.(*storageNode))
 		return true
@@ -40,6 +42,11 @@ func TestCachedStorage(t *testing.T) {
 		return
 	}
 	err = sto.Set(context.Background(), "key2", "value2")
+	if err != nil {
+		t.Fatal(err)
+		return
+	}
+	err = sto.Set(context.Background(), "key3", "value3")
 	if err != nil {
 		t.Fatal(err)
 		return

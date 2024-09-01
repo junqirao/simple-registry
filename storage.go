@@ -10,16 +10,20 @@ import (
 )
 
 type (
+	// Storage interface
 	Storage interface {
 		Get(ctx context.Context, key ...string) (v []*KV, err error)
 		Set(ctx context.Context, key string, value interface{}) (err error)
 		Delete(ctx context.Context, key string) (err error)
 	}
-	storages struct {
+	// StorageEventHandler process storage event
+	StorageEventHandler func(t EventType, key string, value interface{})
+	storages            struct {
 		ctx context.Context
 		cfg Config
 		db  Database
-		m   sync.Map // key: string, value: Storage
+		m   sync.Map // key: (name)string, value: Storage
+		evs sync.Map // key: (name)string, value: StorageEventHandler
 	}
 )
 
@@ -59,11 +63,21 @@ func (s *storages) watchAndUpdateCaches(ctx context.Context) {
 		name := pos[0]
 		key := strings.Join(pos[1:], s.cfg.Storage.Separator)
 
+		// internal event
 		if sto, ok := s.m.Load(name); ok {
 			sto.(*cachedStorage).handleEvent(e.Type, key, e.Value)
+		}
+
+		// push to event handler
+		if ev, ok := s.evs.Load(name); ok {
+			ev.(StorageEventHandler)(e.Type, key, e.Value)
 		}
 	})
 	if err != nil {
 		g.Log().Errorf(ctx, "failed to watch and update caches at storage: %s", err.Error())
 	}
+}
+
+func (s *storages) SetEventHandler(name string, handler StorageEventHandler) {
+	s.evs.Store(name, handler)
 }
