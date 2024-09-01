@@ -11,7 +11,7 @@ func getConfig() Config {
 	return Config{
 		Type: TypeEtcd,
 		Database: DatabaseConfig{
-			Endpoints: []string{"127.0.0.1:2379", "127.0.0.1:2380", "127.0.0.1:2381"},
+			Endpoints: []string{"172.18.28.11:2379", "172.18.28.11:2380", "172.18.28.11:2381"},
 			Username:  "",
 			Password:  "",
 			Tls:       nil,
@@ -47,7 +47,7 @@ func TestInit(t *testing.T) {
 		return true
 	})
 	t.Log("wait 20 s")
-	time.Sleep(time.Second * 20)
+	time.Sleep(time.Second * 60)
 }
 
 func TestRegistry(t *testing.T) {

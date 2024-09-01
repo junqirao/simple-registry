@@ -14,6 +14,8 @@ import (
 var (
 	// Registry Global instance of registry, use it after Init
 	Registry Interface
+	// Storages Global instance of storages
+	Storages *storages
 	// currentInstance created at Init
 	currentInstance *Instance
 	onceLoad        = sync.Once{}
@@ -63,14 +65,28 @@ type (
 // if context is done, watch loop will stop and local cache won't be updated anymore.
 func Init(ctx context.Context, config Config, ins ...*Instance) (err error) {
 	onceLoad.Do(func() {
+		var db Database
+		config.check()
+		switch config.Type {
+		case TypeEtcd:
+			db, err = newEtcd(ctx, config.Database)
+		default:
+			err = fmt.Errorf("unknown registry type \"%s\"", config.Type)
+		}
+		if err != nil {
+			return
+		}
+
 		// create registry instance
-		if Registry, err = newRegistry(ctx, config); err != nil {
+		if Registry, err = newRegistry(ctx, config, db); err != nil {
 			return
 		}
 		// collect instance info and register
 		if len(ins) > 0 && ins[0] != nil {
 			err = Registry.register(ctx, ins[0].fillInfo().clone())
 		}
+		// create Storages instance
+		Storages = newStorages(ctx, config, db)
 	})
 	return
 }
@@ -82,17 +98,8 @@ type registry struct {
 	evs   *eventWrapper
 }
 
-func newRegistry(ctx context.Context, cfg Config) (r Interface, err error) {
-	cfg.check()
-	reg := &registry{cfg: &cfg}
-	switch cfg.Type {
-	case TypeEtcd:
-		reg.cli, err = newEtcd(ctx, cfg.Database)
-	default:
-		err = fmt.Errorf("unknown registry type \"%s\"", cfg.Type)
-		return
-	}
-
+func newRegistry(ctx context.Context, cfg Config, db Database) (r Interface, err error) {
+	reg := &registry{cfg: &cfg, cli: db}
 	// build local cache
 	reg.buildCache(ctx)
 	// watchAndUpdateCache changes and upsert local cache
@@ -206,7 +213,7 @@ func (r *registry) buildCache(ctx context.Context) {
 }
 
 func (r *registry) watchAndUpdateCache(ctx context.Context) {
-	err := r.cli.Watch(ctx, r.cfg.Prefix, func(ctx context.Context, e Event) {
+	err := r.cli.Watch(ctx, fmt.Sprintf("%sregistry/", r.cfg.Prefix), func(ctx context.Context, e Event) {
 		var instance *Instance
 		switch e.Type {
 		case EventTypeDelete:

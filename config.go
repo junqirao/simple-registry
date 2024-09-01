@@ -13,10 +13,14 @@ type (
 	Config struct {
 		Type              string         `json:"type"`
 		Database          DatabaseConfig `json:"database"`
+		Storage           StorageConfig  `json:"storage"`
 		Prefix            string         `json:"prefix"`              // start with "/",and end with "/" in etcd
 		HeartBeatInterval int64          `json:"heart_beat_interval"` // default 3s
 	}
-
+	// StorageConfig for storage module
+	StorageConfig struct {
+		Separator string `json:"separator"`
+	}
 	// DatabaseConfig for etcd,consul,nacos...
 	DatabaseConfig struct {
 		// common
@@ -48,5 +52,8 @@ func (c *Config) check() {
 	}
 	if c.HeartBeatInterval == 0 {
 		c.HeartBeatInterval = defaultHeartBeatInterval
+	}
+	if c.Storage.Separator == "" {
+		c.Storage.Separator = defaultIdentitySeparator
 	}
 }
