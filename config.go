@@ -2,6 +2,7 @@ package simple_registry
 
 import (
 	"crypto/tls"
+	"fmt"
 )
 
 var (
@@ -56,4 +57,12 @@ func (c *Config) check() {
 	if c.Storage.Separator == "" {
 		c.Storage.Separator = defaultIdentitySeparator
 	}
+}
+
+func (c *Config) getStoragePrefix() string {
+	return fmt.Sprintf("%sstorage/", c.Prefix)
+}
+
+func (c *Config) getRegistryPrefix() string {
+	return fmt.Sprintf("%sregistry/", c.Prefix)
 }

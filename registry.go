@@ -132,7 +132,7 @@ func (r *registry) register(ctx context.Context, ins *Instance) (err error) {
 	// register with heartbeat
 	// renew a context in case upstream context closed cause heartbeat timeout
 	if err = r.cli.Set(context.Background(),
-		currentInstance.registryIdentity(r.cfg.Prefix),
+		currentInstance.registryIdentity(r.cfg.getRegistryPrefix()),
 		currentInstance.String(),
 		r.cfg.HeartBeatInterval, true); err != nil {
 		return
@@ -184,7 +184,7 @@ func (r *registry) RegisterEventHandler(handler EventHandler) {
 }
 
 func (r *registry) buildCache(ctx context.Context) {
-	response, err := r.cli.Get(ctx, r.cfg.Prefix)
+	response, err := r.cli.Get(ctx, r.cfg.getRegistryPrefix())
 	if err != nil {
 		g.Log().Errorf(ctx, "registry failed to build etcd cache: %v", err)
 		return
@@ -213,7 +213,8 @@ func (r *registry) buildCache(ctx context.Context) {
 }
 
 func (r *registry) watchAndUpdateCache(ctx context.Context) {
-	err := r.cli.Watch(ctx, fmt.Sprintf("%sregistry/", r.cfg.Prefix), func(ctx context.Context, e Event) {
+	pfx := r.cfg.getRegistryPrefix()
+	err := r.cli.Watch(ctx, pfx, func(ctx context.Context, e Event) {
 		var instance *Instance
 		switch e.Type {
 		case EventTypeDelete:
@@ -225,7 +226,7 @@ func (r *registry) watchAndUpdateCache(ctx context.Context) {
 					service = value.(*Service)
 				)
 
-				instance = service.remove(strings.TrimPrefix(e.Key, r.cfg.Prefix))
+				instance = service.remove(strings.TrimPrefix(e.Key, pfx))
 				deleted = instance != nil
 
 				// remove empty service
