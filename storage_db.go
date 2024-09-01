@@ -42,8 +42,6 @@ func (s *storage) Delete(ctx context.Context, key string) (err error) {
 func (s *storage) buildStorageKey(key ...string) string {
 	builder := strings.Builder{}
 	builder.WriteString(s.prefix)
-	builder.WriteString("storage")
-	builder.WriteString(s.cfg.Separator)
 	builder.WriteString(s.name)
 	builder.WriteString(s.cfg.Separator)
 	if len(key) > 0 && key[0] != "" {

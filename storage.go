@@ -2,7 +2,6 @@ package simple_registry
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"sync"
 
@@ -43,7 +42,7 @@ func (s *storages) Get(name string, uncached ...bool) Storage {
 	}
 
 	if cs == nil {
-		cs = newCachedStorage(s.ctx, newStorage(s.cfg.Prefix, name, s.db, s.cfg.Storage))
+		cs = newCachedStorage(s.ctx, newStorage(s.cfg.getStoragePrefix(), name, s.db, s.cfg.Storage))
 		s.m.Store(name, cs)
 	}
 
@@ -54,7 +53,7 @@ func (s *storages) Get(name string, uncached ...bool) Storage {
 }
 
 func (s *storages) watchAndUpdateCaches(ctx context.Context) {
-	pfx := fmt.Sprintf("%sstorage/", s.cfg.Prefix)
+	pfx := s.cfg.getStoragePrefix()
 	err := s.db.Watch(ctx, pfx, func(ctx context.Context, e Event) {
 		pos := strings.Split(strings.TrimPrefix(e.Key, pfx), s.cfg.Storage.Separator)
 		if len(pos) == 0 {

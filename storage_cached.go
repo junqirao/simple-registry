@@ -18,7 +18,7 @@ type (
 		name   string
 		next   sync.Map     // key: string, value *storageNode
 		mu     sync.RWMutex // protect values
-		values []*KV        // only in leaf node
+		values []*KV
 	}
 )
 
@@ -130,14 +130,16 @@ func (c *cachedStorage) remove(key string) {
 		}
 	}
 
-	if _, has := node.next.Load(pos[len(pos)-1]); has {
-		node.next.Delete(pos[len(pos)-1])
-	} else {
-		for i, value := range node.values {
-			if value.Key == key {
-				node.values = append(node.values[:i], node.values[i+1:]...)
-			}
+	// in next layer
+	if target, has := node.next.Load(pos[len(pos)-1]); has {
+		if strings.HasSuffix(key, c.db.cfg.Separator) {
+			node.next.Delete(pos[len(pos)-1])
+		} else {
+			target.(*storageNode).removeValue(c.db.buildStorageKey(key))
 		}
+	} else {
+		// in current layer
+		node.removeValue(c.db.buildStorageKey(key))
 	}
 }
 
@@ -203,4 +205,14 @@ func (n *storageNode) updateOrInsertValue(key string, value interface{}) {
 	}
 
 	n.values = append(n.values, &KV{Key: key, Value: g.NewVar(value)})
+}
+
+func (n *storageNode) removeValue(key string) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	for i, value := range n.values {
+		if value.Key == key {
+			n.values = append(n.values[:i], n.values[i+1:]...)
+		}
+	}
 }
