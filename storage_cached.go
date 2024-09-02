@@ -2,10 +2,15 @@ package simple_registry
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"sync"
 
 	"github.com/gogf/gf/v2/frame/g"
+)
+
+var (
+	ErrStorageNotFound = errors.New("not found in storage")
 )
 
 type (
@@ -63,6 +68,7 @@ func (c *cachedStorage) Get(_ context.Context, key ...string) (vs []*KV, err err
 	node = c.root
 	for _, po := range pos {
 		if v, ok := node.next.Load(po); !ok {
+			err = ErrStorageNotFound
 			return
 		} else {
 			node = v.(*storageNode)

@@ -26,7 +26,7 @@ func TestCachedStorage(t *testing.T) {
 		return
 	}
 
-	sto := Storages.Get("test")
+	sto := Storages.GetStorage("test")
 	cs := sto.(*cachedStorage)
 	// print tree
 	dfs(cs.root)
@@ -158,7 +158,7 @@ func TestEvent(t *testing.T) {
 
 	go func() {
 		for {
-			dfs(Storages.Get("test").(*cachedStorage).root)
+			dfs(Storages.GetStorage("test").(*cachedStorage).root)
 			fmt.Println("---------------------------")
 			time.Sleep(time.Second * 5)
 		}

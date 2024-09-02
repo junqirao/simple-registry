@@ -33,8 +33,8 @@ func newStorages(ctx context.Context, cfg Config, db Database) *storages {
 	return sto
 }
 
-// Get or create Storage instance
-func (s *storages) Get(name string, uncached ...bool) Storage {
+// GetStorage or create Storage instance
+func (s *storages) GetStorage(name string, uncached ...bool) Storage {
 	var cs *cachedStorage
 	v, ok := s.m.Load(name)
 	if ok {
