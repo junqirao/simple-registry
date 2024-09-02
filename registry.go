@@ -148,7 +148,7 @@ func (r *registry) Deregister(ctx context.Context) (err error) {
 	if currentInstance == nil {
 		return
 	}
-	err = r.cli.Delete(ctx, currentInstance.registryIdentity())
+	err = r.cli.Delete(ctx, currentInstance.registryIdentity(r.cfg.getRegistryPrefix()))
 	return
 }
 
