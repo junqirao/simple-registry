@@ -186,6 +186,7 @@ func (c *cachedStorage) buildCache(ctx context.Context) {
 }
 
 func (c *cachedStorage) handleEvent(t EventType, key string, value interface{}) {
+	key = c.db.buildStorageKey(key)
 	switch t {
 	case EventTypeUpdate, EventTypeCreate:
 		c.setCache(key, value)
