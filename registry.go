@@ -42,7 +42,7 @@ type (
 		// Deregister deregister currentInstance
 		Deregister(ctx context.Context) (err error)
 		// GetService by service name
-		GetService(ctx context.Context, serviceName string) (service *Service, err error)
+		GetService(ctx context.Context, serviceName ...string) (service *Service, err error)
 		// GetServices of all
 		GetServices(ctx context.Context) (services map[string]*Service, err error)
 		// RegisterEventHandler register event handler
@@ -152,8 +152,12 @@ func (r *registry) Deregister(ctx context.Context) (err error) {
 	return
 }
 
-func (r *registry) GetService(_ context.Context, serviceName string) (service *Service, err error) {
-	value, ok := r.cache.Load(serviceName)
+func (r *registry) GetService(_ context.Context, serviceName ...string) (service *Service, err error) {
+	name := currentInstance.ServiceName
+	if len(serviceName) > 0 {
+		name = serviceName[0]
+	}
+	value, ok := r.cache.Load(name)
 	if ok {
 		service = value.(*Service)
 	} else {
