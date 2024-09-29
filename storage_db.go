@@ -29,10 +29,18 @@ func (s *storage) Get(ctx context.Context, key ...string) (v []*KV, err error) {
 }
 
 func (s *storage) Set(ctx context.Context, key string, value interface{}) (err error) {
+	return s.set(ctx, key, value, 0)
+}
+
+func (s *storage) SetTTL(ctx context.Context, key string, value interface{}, ttl int64) (err error) {
+	return s.set(ctx, key, value, ttl)
+}
+
+func (s *storage) set(ctx context.Context, key string, value interface{}, ttl int64) (err error) {
 	if !strings.HasPrefix(key, s.name) {
 		key = s.buildStorageKey(key)
 	}
-	return s.Database.Set(ctx, key, value, 0)
+	return s.Database.Set(ctx, key, value, ttl)
 }
 
 func (s *storage) Delete(ctx context.Context, key string) (err error) {

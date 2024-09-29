@@ -88,6 +88,16 @@ func (c *cachedStorage) Set(ctx context.Context, key string, value interface{}) 
 	return
 }
 
+func (c *cachedStorage) SetTTL(ctx context.Context, key string, value interface{}, ttl int64) (err error) {
+	err = c.db.SetTTL(ctx, key, value, ttl)
+	if err != nil {
+		return
+	}
+
+	c.setCache(c.db.buildStorageKey(key), value)
+	return
+}
+
 func (c *cachedStorage) setCache(key string, value interface{}) {
 	pos := strings.Split(strings.TrimPrefix(key, c.db.buildStorageKey()), c.db.cfg.Separator)
 	node := c.root

@@ -13,6 +13,7 @@ type (
 	Storage interface {
 		Get(ctx context.Context, key ...string) (v []*KV, err error)
 		Set(ctx context.Context, key string, value interface{}) (err error)
+		SetTTL(ctx context.Context, key string, value interface{}, ttl int64) (err error)
 		Delete(ctx context.Context, key string) (err error)
 	}
 	// StorageEventHandler process storage event
