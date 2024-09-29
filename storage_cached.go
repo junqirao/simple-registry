@@ -88,7 +88,7 @@ func (c *cachedStorage) Set(ctx context.Context, key string, value interface{}) 
 	return
 }
 
-func (c *cachedStorage) SetTTL(ctx context.Context, key string, value interface{}, ttl int64) (err error) {
+func (c *cachedStorage) SetTTL(ctx context.Context, key string, value interface{}, ttl int64, keepalive ...bool) (err error) {
 	err = c.db.SetTTL(ctx, key, value, ttl)
 	if err != nil {
 		return

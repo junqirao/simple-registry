@@ -32,15 +32,15 @@ func (s *storage) Set(ctx context.Context, key string, value interface{}) (err e
 	return s.set(ctx, key, value, 0)
 }
 
-func (s *storage) SetTTL(ctx context.Context, key string, value interface{}, ttl int64) (err error) {
-	return s.set(ctx, key, value, ttl)
+func (s *storage) SetTTL(ctx context.Context, key string, value interface{}, ttl int64, keepalive ...bool) (err error) {
+	return s.set(ctx, key, value, ttl, keepalive...)
 }
 
-func (s *storage) set(ctx context.Context, key string, value interface{}, ttl int64) (err error) {
+func (s *storage) set(ctx context.Context, key string, value interface{}, ttl int64, keepalive ...bool) (err error) {
 	if !strings.HasPrefix(key, s.name) {
 		key = s.buildStorageKey(key)
 	}
-	return s.Database.Set(ctx, key, value, ttl)
+	return s.Database.Set(ctx, key, value, ttl, keepalive...)
 }
 
 func (s *storage) Delete(ctx context.Context, key string) (err error) {

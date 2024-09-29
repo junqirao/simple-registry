@@ -11,9 +11,13 @@ import (
 type (
 	// Storage interface
 	Storage interface {
+		// Get value
 		Get(ctx context.Context, key ...string) (v []*KV, err error)
+		// Set value
 		Set(ctx context.Context, key string, value interface{}) (err error)
-		SetTTL(ctx context.Context, key string, value interface{}, ttl int64) (err error)
+		// SetTTL set value with ttl in second
+		SetTTL(ctx context.Context, key string, value interface{}, ttl int64, keepalive ...bool) (err error)
+		// Delete value
 		Delete(ctx context.Context, key string) (err error)
 	}
 	// StorageEventHandler process storage event
